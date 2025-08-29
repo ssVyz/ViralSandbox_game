@@ -1,0 +1,16 @@
+# Virus Sandbox Requirements
+# This game uses only Python standard library modules
+# No external dependencies required
+
+# Standard library modules used:
+# - tkinter (GUI)
+# - json (data storage)
+# - os (file operations)
+# - datetime (timestamps)
+# - copy (object cloning)
+# - random (RNG)
+# - abc (abstract base classes)
+
+# If you need to ensure Python version compatibility,
+# check that you're running Python 3.8 or higher with:
+# python --version

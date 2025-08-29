@@ -5893,7 +5893,7 @@ class VirusSandboxController:
         # Seed deck with 10 random genes
         import random
         all_genes = database_manager.get_all_genes()
-        initial_deck_size = min(60, len(all_genes))
+        initial_deck_size = min(7, len(all_genes))
         self.game_state.deck = random.sample(all_genes, initial_deck_size)
         self.game_state.ep = 100  # starting EP
 
