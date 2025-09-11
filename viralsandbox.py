@@ -801,7 +801,7 @@ class VirusBuilder:
         return sum(1 for gene in self.selected_genes if gene.get("is_polymerase", False))
 
     def get_virus_capabilities(self):
-        """Get the full virus configuration - UPDATED WITH INTERFERON SUPPORT"""
+        """Get the full virus configuration - UPDATED WITH INTERFERON SUPPORT AND FIXED MODIFICATION ORDER"""
         available_entities = set()
         transition_rules = []
 
@@ -809,6 +809,7 @@ class VirusBuilder:
         starter_entity_name = self.get_starter_entity()
         available_entities.add(starter_entity_name)
 
+        # FIRST PASS: Process all add_transition effects to create all rules
         for gene in self.selected_genes:
             for effect in gene["effects"]:
                 if effect["type"] in ["add_transition", "add_production"]:
@@ -827,13 +828,18 @@ class VirusBuilder:
 
                     transition_rules.append(rule)
 
-                elif effect["type"] == "modify_transition":
+        # SECOND PASS: Process all modify_transition effects to modify existing rules
+        for gene in self.selected_genes:
+            for effect in gene["effects"]:
+                if effect["type"] == "modify_transition":
                     # Find and modify existing rule
                     rule_name = effect["rule_name"]
                     modification = effect.get("modification", {})
 
+                    rule_found = False
                     for rule in transition_rules:
                         if rule["name"] == rule_name:
+                            rule_found = True
                             # Apply probability multiplier (existing functionality)
                             if "probability_multiplier" in modification:
                                 rule["probability"] *= modification["probability_multiplier"]
@@ -845,6 +851,12 @@ class VirusBuilder:
                                 if current_interferon > 0:  # Only modify if rule actually has interferon
                                     new_interferon = current_interferon * modification["interferon_multiplier"]
                                     rule["interferon_amount"] = round(new_interferon, 2)
+                            break  # Found and modified the rule, no need to continue searching
+
+                    # Optional: Add warning if no rule was found to modify
+                    # This can help with debugging but shouldn't be shown to end users
+                    if not rule_found:
+                        print(f"Warning: Could not find transition rule '{rule_name}' to modify")
 
         # Get degradation rates for all entities
         entity_degradation_rates = {}
