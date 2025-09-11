@@ -2445,7 +2445,7 @@ class BuilderModule(GameModule):
 
 
 class PlayModule(GameModule):
-    """Virus simulation play module with dramatic turn display and location-based entity grouping - UPDATED WITH ENTITY TYPE BARS AND GENE DIALOG"""
+    """Virus simulation play module with dramatic turn display and line graph entity tracking - UPDATED WITH LINE GRAPH AND GENE DIALOG"""
 
     def __init__(self, parent, controller):
         self.simulation = None
@@ -2453,9 +2453,10 @@ class PlayModule(GameModule):
         self.game_state = None
         self.game_won = False  # Track victory condition
 
-        # NEW: Entity type tracking for bars
-        self.entity_type_maxes = {"virion": 10, "RNA": 10, "DNA": 10, "protein": 10}  # Track max values for bars
-        self.entity_type_current = {"virion": 0, "RNA": 0, "DNA": 0, "protein": 0}  # Current values
+        # NEW: Entity type tracking for line graph (last 50 turns)
+        self.entity_type_history = {"virion": [], "RNA": [], "DNA": [], "protein": []}  # Store last 50 values
+        self.turn_numbers = []  # Store corresponding turn numbers
+        self.max_history_length = 50
 
         super().__init__(parent, controller)
 
@@ -2571,26 +2572,38 @@ class PlayModule(GameModule):
         )
         warning_label.pack(pady=(5, 0))
 
-        # === NEW: ENTITY TYPE BARS SECTION ===
-        bars_frame = ttk.LabelFrame(right_panel, text="Entity Populations", padding=15)
-        bars_frame.pack(fill=tk.X, pady=(0, 15))
+        # === NEW: ENTITY TYPE LINE GRAPH SECTION ===
+        graph_frame = ttk.LabelFrame(right_panel, text="Entity Populations (Last 50 Turns)", padding=15)
+        graph_frame.pack(fill=tk.X, pady=(0, 15))
 
-        # Create bars for each entity type
-        self.entity_bars = {}
+        # Current count labels
         self.entity_labels = {}
+        labels_frame = ttk.Frame(graph_frame)
+        labels_frame.pack(fill=tk.X, pady=(0, 10))
 
-        bar_configs = [
+        # Entity type configurations (same colors as before)
+        self.entity_configs = [
             ("virion", "Virions", "#6b7280"),  # Grey
             ("RNA", "RNA", "#22c55e"),  # Green
             ("DNA", "DNA", "#3b82f6"),  # Blue
             ("protein", "Proteins", "#f97316")  # Orange
         ]
 
-        for i, (entity_type, display_name, color) in enumerate(bar_configs):
-            # Label with count
-            label_frame = ttk.Frame(bars_frame)
-            label_frame.pack(fill=tk.X, pady=(0, 2))
+        # Create labels for current counts
+        for i, (entity_type, display_name, color) in enumerate(self.entity_configs):
+            # Create label frame
+            label_frame = ttk.Frame(labels_frame)
+            if i < 2:  # First row
+                label_frame.grid(row=0, column=i, sticky=tk.W, padx=(0, 20))
+            else:  # Second row
+                label_frame.grid(row=1, column=i - 2, sticky=tk.W, padx=(0, 20))
 
+            # Color indicator (small square)
+            color_canvas = tk.Canvas(label_frame, width=12, height=12, highlightthickness=0)
+            color_canvas.pack(side=tk.LEFT, padx=(0, 5))
+            color_canvas.create_rectangle(0, 0, 12, 12, fill=color, outline="")
+
+            # Label with count
             self.entity_labels[entity_type] = ttk.Label(
                 label_frame,
                 text=f"{display_name}: 0",
@@ -2598,19 +2611,9 @@ class PlayModule(GameModule):
             )
             self.entity_labels[entity_type].pack(side=tk.LEFT)
 
-            # Progress bar
-            bar_frame = ttk.Frame(bars_frame)
-            bar_frame.pack(fill=tk.X, pady=(0, 8))
-
-            # Create a canvas for custom colored bar
-            canvas = tk.Canvas(bar_frame, height=20, bg="#f1f5f9", relief=tk.FLAT, borderwidth=1)
-            canvas.pack(fill=tk.X)
-
-            self.entity_bars[entity_type] = {
-                'canvas': canvas,
-                'color': color,
-                'display_name': display_name
-            }
+        # Line graph canvas
+        self.graph_canvas = tk.Canvas(graph_frame, height=200, bg="white", relief=tk.SUNKEN, borderwidth=1)
+        self.graph_canvas.pack(fill=tk.X, pady=(10, 0))
 
         # === NEW: GENES DIALOG BUTTON ===
         genes_frame = ttk.LabelFrame(right_panel, text="Virus Configuration", padding=15)
@@ -2644,13 +2647,13 @@ class PlayModule(GameModule):
             borderwidth=1
         )
 
-    def reset_entity_type_maxes(self):
-        """Reset the maximum values for entity type bars when returning to builder"""
-        self.entity_type_maxes = {"virion": 10, "RNA": 10, "DNA": 10, "protein": 10}
-        self.entity_type_current = {"virion": 0, "RNA": 0, "DNA": 0, "protein": 0}
+    def reset_entity_type_history(self):
+        """Reset the historical data for entity type graph when returning to builder"""
+        self.entity_type_history = {"virion": [], "RNA": [], "DNA": [], "protein": []}
+        self.turn_numbers = []
 
-    def update_entity_type_bars(self, entities):
-        """Update the entity type progress bars with current entity counts"""
+    def update_entity_type_graph(self, entities, turn_number):
+        """Update the entity type line graph with current entity counts"""
         if not self.db_manager:
             return
 
@@ -2664,63 +2667,167 @@ class PlayModule(GameModule):
                 if entity_class in type_counts:
                     type_counts[entity_class] += count
 
-        # Update maximums if any count exceeded current max
-        overall_max_changed = False
-        for entity_type, count in type_counts.items():
-            if count > self.entity_type_maxes[entity_type]:
-                self.entity_type_maxes[entity_type] = count
-                overall_max_changed = True
+        # Add current data to history
+        self.turn_numbers.append(turn_number)
+        for entity_type in self.entity_type_history:
+            self.entity_type_history[entity_type].append(type_counts[entity_type])
 
-        # If any max changed, update all maxes to the highest value for consistent scaling
-        if overall_max_changed:
-            new_overall_max = max(self.entity_type_maxes.values())
-            for entity_type in self.entity_type_maxes:
-                self.entity_type_maxes[entity_type] = max(new_overall_max, 10)  # Minimum of 10
+        # Maintain sliding window of last 50 turns
+        if len(self.turn_numbers) > self.max_history_length:
+            self.turn_numbers = self.turn_numbers[-self.max_history_length:]
+            for entity_type in self.entity_type_history:
+                self.entity_type_history[entity_type] = self.entity_type_history[entity_type][-self.max_history_length:]
 
-        # Store current counts
-        self.entity_type_current = type_counts.copy()
-
-        # Update the visual bars
-        overall_max = max(self.entity_type_maxes.values())
-
-        for entity_type, bar_info in self.entity_bars.items():
+        # Update current count labels
+        for entity_type, display_name, color in self.entity_configs:
             current_count = type_counts[entity_type]
-            canvas = bar_info['canvas']
-            color = bar_info['color']
-            display_name = bar_info['display_name']
-
-            # Update label
             self.entity_labels[entity_type].config(text=f"{display_name}: {current_count}")
 
-            # Clear canvas
-            canvas.delete("all")
+        # Draw the line graph
+        self.draw_line_graph()
 
-            # Get canvas dimensions
-            canvas.update_idletasks()
-            width = canvas.winfo_width()
-            height = canvas.winfo_height()
+    def draw_line_graph(self):
+        """Draw the line graph showing entity population history"""
+        canvas = self.graph_canvas
+        canvas.delete("all")
 
-            if width > 1:  # Only draw if canvas is properly sized
-                # Calculate bar width as percentage of max
-                if overall_max > 0:
-                    bar_width = (current_count / overall_max) * width
-                else:
-                    bar_width = 0
+        # Get canvas dimensions
+        canvas.update_idletasks()
+        width = canvas.winfo_width()
+        height = canvas.winfo_height()
 
-                # Draw background
-                canvas.create_rectangle(0, 0, width, height, fill="#f1f5f9", outline="#e2e8f0")
+        if width <= 1 or height <= 1:
+            return
 
-                # Draw filled bar
-                if bar_width > 0:
-                    canvas.create_rectangle(2, 2, bar_width - 2, height - 2, fill=color, outline="")
+        # Graph margins
+        margin_left = 40
+        margin_right = 20
+        margin_top = 20
+        margin_bottom = 30
 
-                # Draw text overlay with count
-                if current_count > 0:
-                    fill_ratio = (current_count / overall_max) if overall_max else 0
-                    text_color = "white" if fill_ratio >= 0.5 else "#374151"
+        graph_width = width - margin_left - margin_right
+        graph_height = height - margin_top - margin_bottom
 
-                    canvas.create_text(width // 2, height // 2, text=str(current_count),
-                                       fill=text_color, font=("Arial", 9, "bold"))
+        if graph_width <= 0 or graph_height <= 0:
+            return
+
+        # Calculate data bounds
+        if not self.turn_numbers:
+            # Draw empty graph
+            canvas.create_text(width // 2, height // 2, text="No data yet", fill="gray", font=("Arial", 12))
+            return
+
+        min_turn = min(self.turn_numbers)
+        max_turn = max(self.turn_numbers)
+
+        # Find maximum value across all entity types for y-axis scaling
+        max_value = 0
+        for entity_type in self.entity_type_history:
+            if self.entity_type_history[entity_type]:
+                max_value = max(max_value, max(self.entity_type_history[entity_type]))
+
+        if max_value == 0:
+            max_value = 10  # Minimum scale
+
+        # Draw background grid
+        self.draw_grid(canvas, margin_left, margin_top, graph_width, graph_height,
+                       min_turn, max_turn, max_value)
+
+        # Draw axes
+        # Y-axis
+        canvas.create_line(margin_left, margin_top, margin_left, margin_top + graph_height,
+                           fill="black", width=2)
+        # X-axis
+        canvas.create_line(margin_left, margin_top + graph_height, margin_left + graph_width,
+                           margin_top + graph_height, fill="black", width=2)
+
+        # Draw axis labels
+        self.draw_axis_labels(canvas, margin_left, margin_top, graph_width, graph_height,
+                              min_turn, max_turn, max_value)
+
+        # Draw lines for each entity type
+        for entity_type, display_name, color in self.entity_configs:
+            if entity_type in self.entity_type_history and self.entity_type_history[entity_type]:
+                self.draw_entity_line(canvas, entity_type, color, margin_left, margin_top,
+                                      graph_width, graph_height, min_turn, max_turn, max_value)
+
+    def draw_grid(self, canvas, margin_left, margin_top, graph_width, graph_height,
+                  min_turn, max_turn, max_value):
+        """Draw background grid lines"""
+        # Horizontal grid lines (for y-values)
+        num_y_lines = 5
+        for i in range(num_y_lines + 1):
+            y = margin_top + (i * graph_height / num_y_lines)
+            canvas.create_line(margin_left, y, margin_left + graph_width, y,
+                               fill="#e5e7eb", width=1)
+
+        # Vertical grid lines (for x-values)
+        num_x_lines = min(10, len(self.turn_numbers))
+        if num_x_lines > 1:
+            for i in range(num_x_lines + 1):
+                x = margin_left + (i * graph_width / num_x_lines)
+                canvas.create_line(x, margin_top, x, margin_top + graph_height,
+                                   fill="#e5e7eb", width=1)
+
+    def draw_axis_labels(self, canvas, margin_left, margin_top, graph_width, graph_height,
+                         min_turn, max_turn, max_value):
+        """Draw axis labels and tick marks"""
+        # Y-axis labels
+        num_y_labels = 5
+        for i in range(num_y_labels + 1):
+            y = margin_top + graph_height - (i * graph_height / num_y_labels)
+            value = int(i * max_value / num_y_labels)
+            canvas.create_text(margin_left - 5, y, text=str(value), anchor=tk.E,
+                               font=("Arial", 8), fill="black")
+
+        # X-axis labels (show turn numbers)
+        if len(self.turn_numbers) > 1:
+            # Show first, middle, and last turn numbers
+            labels_to_show = []
+            if len(self.turn_numbers) <= 10:
+                # Show all if we have few points
+                labels_to_show = list(range(len(self.turn_numbers)))
+            else:
+                # Show first, some middle points, and last
+                labels_to_show = [0, len(self.turn_numbers) // 4, len(self.turn_numbers) // 2,
+                                  3 * len(self.turn_numbers) // 4, len(self.turn_numbers) - 1]
+
+            for i in labels_to_show:
+                if i < len(self.turn_numbers):
+                    turn_num = self.turn_numbers[i]
+                    x = margin_left + (i * graph_width / (len(self.turn_numbers) - 1))
+                    canvas.create_text(x, margin_top + graph_height + 15, text=str(turn_num),
+                                       anchor=tk.N, font=("Arial", 8), fill="black")
+
+        # Axis titles
+        canvas.create_text(margin_left + graph_width // 2, margin_top + graph_height + 25,
+                           text="Turn", anchor=tk.N, font=("Arial", 10, "bold"))
+        canvas.create_text(15, margin_top + graph_height // 2, text="Count", anchor=tk.CENTER,
+                           font=("Arial", 10, "bold"), angle=90)
+
+    def draw_entity_line(self, canvas, entity_type, color, margin_left, margin_top,
+                         graph_width, graph_height, min_turn, max_turn, max_value):
+        """Draw line and dots for a specific entity type"""
+        history = self.entity_type_history[entity_type]
+        if len(history) < 2:
+            return
+
+        points = []
+        for i, count in enumerate(history):
+            # Calculate x position based on turn index
+            x = margin_left + (i * graph_width / (len(history) - 1))
+            # Calculate y position based on count (inverted because canvas y increases downward)
+            y = margin_top + graph_height - (count * graph_height / max_value)
+            points.extend([x, y])
+
+        # Draw the line connecting all points
+        if len(points) >= 4:  # Need at least 2 points (4 coordinates)
+            canvas.create_line(points, fill=color, width=2, smooth=False)
+
+        # Draw dots at each data point
+        for i in range(0, len(points), 2):
+            x, y = points[i], points[i + 1]
+            canvas.create_oval(x - 3, y - 3, x + 3, y + 3, fill=color, outline="white", width=1)
 
     def show_genes_dialog(self):
         """Show dialog with installed genes for this simulation"""
@@ -2798,14 +2905,17 @@ class PlayModule(GameModule):
         dialog.focus_set()
         dialog.bind('<Escape>', lambda e: dialog.destroy())
 
-    # Update the existing update_entities_display method to use the new bars
+    # Update the existing update_entities_display method to use the new graph
     def update_entities_display(self, entities):
-        """Update entity display using the new type bars instead of location grouping"""
-        # Update the new entity type bars
-        self.update_entity_type_bars(entities)
+        """Update entity display using the new line graph"""
+        # Get current turn number
+        turn_number = self.simulation.turn_count if self.simulation else 0
+
+        # Update the line graph
+        self.update_entity_type_graph(entities, turn_number)
 
     def exit_to_builder(self):
-        """Mark offer pending, check milestone achievements, reset entity bars, and return to Builder"""
+        """Mark offer pending, check milestone achievements, reset entity graph, and return to Builder"""
         # Prevent returning to builder if game was won
         if self.game_won:
             messagebox.showinfo("Game Complete",
@@ -2813,8 +2923,8 @@ class PlayModule(GameModule):
                                 "To play again, return to the main menu and start a new game.")
             return
 
-        # Reset entity type bar maxes when returning to builder
-        self.reset_entity_type_maxes()
+        # Reset entity type graph data when returning to builder
+        self.reset_entity_type_history()
 
         if self.game_state:
             self.game_state.offer_pending = True
@@ -2895,7 +3005,7 @@ class PlayModule(GameModule):
         for message in turn_log:
             self.add_console_message(message)
 
-        # Update displays - now uses the new bars
+        # Update displays - now uses the new graph
         self.update_entities_display(self.simulation.entities)
 
     def _process_single_turn_dramatic(self):
@@ -2918,7 +3028,7 @@ class PlayModule(GameModule):
         # Display log with dramatic timing
         self._display_turn_log_dramatically(turn_log)
 
-        # Update displays - now uses the new bars
+        # Update displays - now uses the new graph
         self.update_entities_display(self.simulation.entities)
 
     def _display_turn_log_dramatically(self, turn_log):
@@ -3042,8 +3152,8 @@ class PlayModule(GameModule):
         self.simulation_active = True
         self.game_won = False
 
-        # Reset entity type maxes for new simulation
-        self.reset_entity_type_maxes()
+        # Reset entity type history for new simulation
+        self.reset_entity_type_history()
 
         # Enable control buttons
         self.set_control_buttons_state('normal')
@@ -3060,7 +3170,7 @@ class PlayModule(GameModule):
         # Update displays
         self.turn_label.config(text=f"Turn: {self.simulation.turn_count}")
         self.update_interferon_display()
-        self.update_entities_display(self.simulation.entities)  # Now uses bars
+        self.update_entities_display(self.simulation.entities)  # Now uses graph
 
         # Enhanced intro messages
         self.add_console_message("=" * 70)
