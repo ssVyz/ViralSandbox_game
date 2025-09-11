@@ -13,6 +13,34 @@ This repository hosts an experimental Python application that models basic viral
 - Simulation rules and entities are described in JSON.
 - Uses only Python standard library modules (Tkinter for GUI, json for storage, etc.).
 
+### Core Classes
+
+- **GeneDatabaseManager** – loads, saves and validates gene/entity databases.
+- **GeneDatabase** – lightweight interface exposing gene data to builders and simulations.
+- **VirusBuilder** – assembles viruses from selected genes and enforces prerequisites.
+- **ViralSimulation** – executes the turn-based simulation and tracks milestones.
+- **GameState** – holds mutable state such as selected genes, starter entity and stats.
+- **Modules** – GUI screens built on the `GameModule` base class
+  (e.g. `MenuModule`, `BuilderModule`, `PlayModule`, `EditorModule`).
+- **VirusSandboxController** – orchestrates modules and maintains the shared `GameState`.
+
+### Class Interaction
+
+```mermaid
+classDiagram
+    class VirusSandboxController
+    VirusSandboxController --> GameState
+    VirusSandboxController --> MenuModule
+    VirusSandboxController --> BuilderModule
+    VirusSandboxController --> PlayModule
+    VirusSandboxController --> EditorModule
+    BuilderModule --> VirusBuilder
+    VirusBuilder --> GeneDatabase
+    GeneDatabase --> GeneDatabaseManager
+    PlayModule --> ViralSimulation
+    ViralSimulation --> GameState
+```
+
 ## Requirements
 
 - Python 3.8 or newer.
