@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="792d120c-73be-4571-89a1-47d50a8f9daf" name="Changes" comment="Fixed modifiers with second path method">
+    <list default="true" id="792d120c-73be-4571-89a1-47d50a8f9daf" name="Changes" comment="Changed bar graphs to line plots">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/viralsandbox.py" beforeDir="false" afterPath="$PROJECT_DIR$/viralsandbox.py" afterDir="false" />
     </list>
@@ -100,7 +100,15 @@
       <option name="project" value="LOCAL" />
       <updated>1757604718223</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Changed bar graphs to line plots">
+      <option name="closed" value="true" />
+      <created>1757606586699</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1757606586699</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -119,6 +127,7 @@
     <MESSAGE value="Minor changes&#10;Initial version transferred from virsim 0035" />
     <MESSAGE value="Upload version 1" />
     <MESSAGE value="Fixed modifiers with second path method" />
-    <option name="LAST_COMMIT_MESSAGE" value="Fixed modifiers with second path method" />
+    <MESSAGE value="Changed bar graphs to line plots" />
+    <option name="LAST_COMMIT_MESSAGE" value="Changed bar graphs to line plots" />
   </component>
 </project>
