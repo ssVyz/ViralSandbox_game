@@ -1749,11 +1749,33 @@ class BuilderModule(GameModule):
         text_frame.pack(fill=tk.BOTH, expand=True)
 
         self.details_text = tk.Text(text_frame, state='disabled', wrap=tk.WORD)
+        self._style_text_widget(self.details_text)
         scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.details_text.yview)
         self.details_text.config(yscrollcommand=scrollbar.set)
 
         self.details_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    def _style_text_widget(self, text_widget):
+        """Apply consistent styling to text widgets for better readability"""
+        text_widget.config(
+            font=("Segoe UI", 11),  # Larger, more readable font
+            bg="#fbfbfb",  # Very light gray background (softer than white)
+            fg="#2d3748",  # Dark gray text (easier on eyes than pure black)
+            selectbackground="#e2e8f0",  # Light blue selection
+            selectforeground="#2d3748",  # Keep text readable when selected
+            insertbackground="#4a5568",  # Cursor color
+            relief="flat",  # Flat appearance
+            borderwidth=1,  # Subtle border
+            highlightthickness=0,  # Remove focus highlight
+            padx=12,  # Horizontal padding
+            pady=8  # Vertical padding
+        )
+
+        # Configure text tags for better formatting
+        text_widget.tag_configure("header", font=("Segoe UI", 12, "bold"), foreground="#1a202c")
+        text_widget.tag_configure("subheader", font=("Segoe UI", 11, "bold"), foreground="#2d3748")
+        text_widget.tag_configure("emphasis", font=("Segoe UI", 11, "italic"), foreground="#4a5568")
 
     def show(self):
         super().show()
@@ -1893,6 +1915,20 @@ class BuilderModule(GameModule):
         else:
             details.append("Effects: None")
             details.append("")
+
+        # Enhanced formatting for better readability
+        formatted_details = []
+        for line in details:
+            # Add extra spacing after headers
+            if line.startswith("Gene:") or line.startswith("Description:") or line.startswith(
+                    "Prerequisites:") or line.startswith("Effects:"):
+                if formatted_details:  # Don't add space before first line
+                    formatted_details.append("")
+                formatted_details.append(line)
+            else:
+                formatted_details.append(line)
+
+        return "\n".join(formatted_details)
 
         return "\n".join(details)
 
@@ -2511,11 +2547,9 @@ class PlayModule(GameModule):
         self.console_text = scrolledtext.ScrolledText(
             console_frame,
             state='disabled',
-            wrap=tk.WORD,
-            font=("Consolas", 10),
-            bg="#f8fafc",
-            fg="#1e293b"
+            wrap=tk.WORD
         )
+        self._style_text_widget(self.console_text)
         self.console_text.pack(fill=tk.BOTH, expand=True)
 
         # Right panel - Controls and stats (reorganized and enhanced)
@@ -2628,6 +2662,22 @@ class PlayModule(GameModule):
 
         # Configure custom styles
         self.setup_styles()
+
+    def _style_text_widget(self, text_widget):
+        """Apply consistent styling to text widgets for better readability"""
+        text_widget.config(
+            font=("Consolas", 11),  # Monospace font for console, but larger
+            bg="#f7fafc",  # Very light blue-gray background
+            fg="#2d3748",  # Dark gray text
+            selectbackground="#bee3f8",  # Light blue selection
+            selectforeground="#1a202c",  # Keep text readable when selected
+            insertbackground="#4a5568",  # Cursor color
+            relief="flat",  # Flat appearance
+            borderwidth=1,  # Subtle border
+            highlightthickness=0,  # Remove focus highlight
+            padx=10,  # Horizontal padding
+            pady=6  # Vertical padding
+        )
 
     def setup_styles(self):
         """Setup custom styles for enhanced appearance"""
