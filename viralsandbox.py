@@ -680,15 +680,12 @@ class GeneDatabase:
 class VirusBuilder:
     """Builds virus configurations from selected genes - UPDATED WITH DYNAMIC STARTER ENTITY, INTERFERON SUPPORT, AND POLYMERASE LIMITING"""
 
-    BIG_BUDGET = 1_000_000  # neutralize legacy budget checks
 
     def __init__(self, gene_database, game_state=None):
         self.gene_db = gene_database
         self.game_state = game_state  # Reference to game state for starter entity
         self.base_entities = ["unenveloped virion (extracellular)"]  # Legacy fallback
         self.selected_genes = []
-        self.budget = 200
-        self.spent = 0
 
     def set_game_state(self, game_state):
         """Set game state reference"""
@@ -702,10 +699,6 @@ class VirusBuilder:
             # Fallback to legacy behavior
             return self.base_entities[0]
 
-    def can_afford_gene(self, gene_name):
-        gene = self.gene_db.get_gene(gene_name)
-        return gene and (self.spent + gene["cost"]) <= self.budget
-
     def can_add_gene(self, gene_name):
         """
         Non-mutating validation for whether a gene can be added.
@@ -714,10 +707,6 @@ class VirusBuilder:
         gene = self.gene_db.get_gene(gene_name)
         if not gene:
             return False, "unknown_gene"
-
-        # Legacy builder budget (neutralized via BIG_BUDGET, but keep check for consistency)
-        if not self.can_afford_gene(gene_name):
-            return False, "builder_budget"
 
         # Already installed?
         if any(g["name"] == gene_name for g in self.selected_genes):
@@ -741,9 +730,6 @@ class VirusBuilder:
         if not gene:
             return False
 
-        if not self.can_afford_gene(gene_name):
-            return False
-
         # Check if already selected
         if any(g["name"] == gene_name for g in self.selected_genes):
             return False
@@ -761,7 +747,6 @@ class VirusBuilder:
                 return False
 
         self.selected_genes.append(gene)
-        self.spent += gene["cost"]
         return True
 
     def remove_gene(self, gene_name):
@@ -781,7 +766,6 @@ class VirusBuilder:
         # Remove the gene itself
         for i, gene in enumerate(self.selected_genes):
             if gene["name"] == gene_name:
-                self.spent -= gene["cost"]
                 del self.selected_genes[i]
                 break
 
@@ -1579,8 +1563,6 @@ class MenuModule(GameModule):
 class BuilderModule(GameModule):
     """Virus builder module - UPDATED WITH IMPROVED LAYOUT, GENE DETAILS, ROUNDS COUNTER, SKIP ROUND BUTTON, AND POLYMERASE GENE LIMITING"""
 
-    BIG_BUDGET = 1_000_000  # neutralize legacy budget checks in VirusBuilder
-
     def __init__(self, parent, controller):
         self.db_manager = None
         self.game_state = None
@@ -1594,9 +1576,8 @@ class BuilderModule(GameModule):
     def set_game_state(self, game_state):
         """Give the builder access to EP + deck; keep editor logic untouched."""
         self.game_state = game_state
-        # Mirror to a very large budget so legacy budget checks never block
+
         if self.virus_builder:
-            self.virus_builder.budget = self.BIG_BUDGET
             self.virus_builder.set_game_state(game_state)  # Wire game state to virus builder
         self.update_virus_display()
         self.update_starter_dropdown()  # Update starter options
@@ -1606,9 +1587,6 @@ class BuilderModule(GameModule):
         self.db_manager = db_manager
         self.gene_db = GeneDatabase(db_manager)
         self.virus_builder = VirusBuilder(self.gene_db, self.game_state)  # Pass game state
-
-        # Neutralize internal budget checks
-        self.virus_builder.budget = self.BIG_BUDGET
 
         self.update_gene_list()
         self.update_virus_display()
@@ -1782,8 +1760,7 @@ class BuilderModule(GameModule):
         self.update_gene_list()
         self.update_virus_display()
         self.update_starter_dropdown()  # Update starter options when showing
-        if self.virus_builder:
-            self.virus_builder.budget = self.BIG_BUDGET
+
 
     # --------- Gene selection handlers for details display ---------
 
@@ -2348,8 +2325,6 @@ class BuilderModule(GameModule):
         if gene_name not in self.game_state.installed_genes:
             self.game_state.installed_genes.append(gene_name)
 
-        # Keep builder budget neutralized and refresh UI
-        self.virus_builder.budget = self.BIG_BUDGET
         self.update_virus_display()
 
     def remove_gene(self):
@@ -2393,7 +2368,6 @@ class BuilderModule(GameModule):
         if gene_name in self.game_state.installed_genes:
             self.game_state.installed_genes.remove(gene_name)
 
-        self.virus_builder.budget = self.BIG_BUDGET
         self.update_virus_display()
 
     def clear_all_genes(self):
@@ -2419,8 +2393,7 @@ class BuilderModule(GameModule):
             if self.game_state and gene_name in self.game_state.installed_genes:
                 self.game_state.installed_genes.remove(gene_name)
 
-        if self.virus_builder:
-            self.virus_builder.budget = self.BIG_BUDGET
+
         self.update_virus_display()
 
     # =================== SKIP ROUND FUNCTIONALITY ===================
